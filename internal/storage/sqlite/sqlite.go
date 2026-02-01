@@ -101,3 +101,64 @@ func (s *SQLite) GetStudents() ([]types.Student, error) {
 
 	return students, nil
 }
+
+
+func (s *SQLite) UpdateStudentById(id int64, updates map[string]interface{}) error {
+    if len(updates) == 0 {
+        return fmt.Errorf("no fields to update")
+    }
+
+    query := "UPDATE students SET "
+    args := []interface{}{}
+    first := true
+
+    for key, value := range updates {
+        if !first {
+            query += ", "
+        }
+        query += key + " = ?"
+        args = append(args, value)
+        first = false
+    }
+
+    query += " WHERE id = ?"
+    args = append(args, id)
+
+    stmt, err := s.Db.Prepare(query)
+    if err != nil {
+        return err
+    }
+    defer stmt.Close()
+
+    result, err := stmt.Exec(args...)
+    if err != nil {
+        return err
+    }
+
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return err
+    }
+
+    if rowsAffected == 0 {
+        return fmt.Errorf("student with id %d not found", id)
+    }
+
+    return nil
+}
+
+func (s *SQLite) DeleteStudentById(id int64) error {
+	stmt, err := s.Db.Prepare("DELETE FROM students WHERE id = ?")
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

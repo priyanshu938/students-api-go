@@ -86,3 +86,68 @@ func GetList(storage storage.Storage) http.HandlerFunc {
 		response.WriteJson(w, http.StatusOK, students)
 	}
 }
+
+func UpdateById(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		slog.Info("updating a student by id", slog.String("id", id))
+
+		intId, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(err))
+			return
+		}
+
+		var updates map[string]interface{}
+
+		err = json.NewDecoder(r.Body).Decode(&updates)
+		if errors.Is(err, io.EOF) {
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body")))
+			return
+		}
+
+		if err != nil {
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(err))
+			return
+		}
+
+		// Validate that only allowed fields are being updated
+		allowedFields := map[string]bool{"name": true, "email": true, "age": true}
+		for key := range updates {
+			if !allowedFields[key] {
+				response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("invalid field: %s", key)))
+				return
+			}
+		}
+
+		err = storage.UpdateStudentById(intId, updates)
+		if err != nil {
+			slog.Error("failed to update student by id", slog.String("id", id))
+			response.WriteJson(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+
+		response.WriteJson(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("student with id %d updated successfully", intId)})
+	}
+}
+
+func DeleteById(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		slog.Info("getting a student by id", slog.String("id", id))
+		intId, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(err))
+			return
+		}
+
+		err = storage.DeleteStudentById(intId)
+		if err != nil {
+			slog.Error("failed to delete student by id", slog.String("id", id))
+			response.WriteJson(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+
+		response.WriteJson(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("student with id %d deleted successfully", intId)})
+	}
+}
